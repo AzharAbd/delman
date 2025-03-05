@@ -35,7 +35,6 @@ type Transaction[K comparable, V any] struct {
 	rolledBack bool
 }
 
-// **Create a new Database**
 func NewDatabase[K comparable, V any]() *Database[K, V] {
 	return &Database[K, V]{
 		data:  make(map[K]V),
@@ -101,7 +100,7 @@ func (db *Database[K, V]) StartTransaction(keys []K) *Transaction[K, V] {
 	return tx
 }
 
-// **GetForUpdate: Read inside a transaction (modifies temp storage)**
+// **Get: Read inside a transaction (modifies temp storage)**
 func (tx *Transaction[K, V]) Get(key K) (V, bool) {
 	val, exists := tx.temp[key]
 	return val, exists
@@ -122,12 +121,10 @@ func (tx *Transaction[K, V]) Commit() error {
 	tx.db.mu.Lock()
 	defer tx.db.mu.Unlock()
 
-	// Apply transaction changes to the main database
 	for key, value := range tx.temp {
 		tx.db.data[key] = value
 	}
 
-	// Unlock all keys
 	for _, lock := range tx.locks {
 		lock.Unlock()
 	}
@@ -143,7 +140,6 @@ func (tx *Transaction[K, V]) Rollback() {
 	}
 	tx.rolledBack = true
 
-	// Unlock all keys
 	for _, lock := range tx.locks {
 		lock.Unlock()
 	}
