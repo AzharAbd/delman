@@ -1,41 +1,41 @@
 package utils
 
 import (
+	"cmp"
 	"errors"
-	"fmt"
-	"sort"
+	"slices"
 	"sync"
 )
 
 // DatabaseInterface defines a concurrent-safe key-value store with transactional support.
-type DatabaseInterface[K comparable, V any] interface {
+type DatabaseInterface[K cmp.Ordered, V any] interface {
 	Get(key K) (V, bool)
 	Set(key K, value V) error
 	StartTransaction(keys []K) *Transaction[K, V]
 }
 
 // TransactionInterface defines an atomic unit of work on the Database.
-type TransactionInterface[K comparable, V any] interface {
+type TransactionInterface[K cmp.Ordered, V any] interface {
 	Get(key K) (V, bool)
 	Set(key K, value V) error
 	Commit() error
 	Rollback()
 }
 
-type Database[K comparable, V any] struct {
+type Database[K cmp.Ordered, V any] struct {
 	mu    sync.RWMutex
 	data  map[K]V
 	locks map[K]*sync.Mutex
 }
 
-type Transaction[K comparable, V any] struct {
+type Transaction[K cmp.Ordered, V any] struct {
 	db         *Database[K, V]
 	locks      []*sync.Mutex
 	temp       map[K]V
 	rolledBack bool
 }
 
-func NewDatabase[K comparable, V any]() *Database[K, V] {
+func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
 	return &Database[K, V]{
 		data:  make(map[K]V),
 		locks: make(map[K]*sync.Mutex),
@@ -81,10 +81,9 @@ func (db *Database[K, V]) StartTransaction(keys []K) *Transaction[K, V] {
 		temp: make(map[K]V),
 	}
 
-	//Sort keys before acquiring locks to prevent deadlock
-	sort.Slice(keys, func(i, j int) bool {
-		return fmt.Sprintf("%v", keys[i]) < fmt.Sprintf("%v", keys[j])
-	})
+	// Sort & remove duplicates to preven deadlock
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
 
 	for _, key := range keys {
 		lock := db.getLock(key)
