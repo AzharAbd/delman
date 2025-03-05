@@ -80,7 +80,7 @@ func (db *Database[K, V]) Set(key K, value V) error {
 
 ### 4. **Transaction Locking (`StartTransaction` Method)**
 - Acquires locks for all specified keys before processing a transaction.
-- Locks are acquired in a sorted order to prevent deadlocks.
+- Locks are acquired in a sorted order without duplicates to prevent deadlocks.
 
 ```go
 func (db *Database[K, V]) StartTransaction(keys []K) *Transaction[K, V] {
@@ -88,9 +88,8 @@ func (db *Database[K, V]) StartTransaction(keys []K) *Transaction[K, V] {
         db:   db,
         temp: make(map[K]V),
     }
-    sort.Slice(keys, func(i, j int) bool {
-        return fmt.Sprintf("%v", keys[i]) < fmt.Sprintf("%v", keys[j])
-    })
+	slices.Sort(keys)
+    keys = slices.Compact(keys)
     for _, key := range keys {
         lock := db.getLock(key)
         lock.Lock()
