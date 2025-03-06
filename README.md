@@ -14,7 +14,7 @@ This project uses the following dependency:
 ### Steps to Install
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/delman.git
+   git clone https://github.com/azharabd/delman.git
    cd delman
    ```
 2. Initialize Go modules (if not already initialized):
@@ -39,12 +39,16 @@ The `database.go` file implements a thread-safe key-value store with a transacti
 
 ```go
 func (db *Database[K, V]) getLock(key K) *sync.Mutex {
-    db.mu.Lock()
-    defer db.mu.Unlock()
-    if _, exists := db.locks[key]; !exists {
-        db.locks[key] = &sync.Mutex{}
+    db.lockMu.RLock()
+
+    lock, exists := db.locks[key]
+    if !exists {
+        db.lockMu.RUnlock()
+        return db.initLock(key)
     }
-    return db.locks[key]
+
+    defer db.lockMu.RUnlock()
+    return lock
 }
 ```
 
@@ -108,24 +112,31 @@ func (db *Database[K, V]) StartTransaction(keys []K) *Transaction[K, V] {
 
 ```go
 func (tx *Transaction[K, V]) Commit() error {
-    if tx.rolledBack {
+    switch tx.txStatus {
+    case TxCommitted:
+        return errors.New("transaction already commited")
+    case TxRolledBack:
         return errors.New("transaction already rolled back")
     }
-    tx.db.mu.Lock()
-    defer tx.db.mu.Unlock()
+    tx.txStatus = TxCommitted
+
+    tx.db.dataMu.Lock()
+    defer tx.db.dataMu.Unlock()
+
     for key, value := range tx.temp {
         tx.db.data[key] = value
     }
+
     for _, lock := range tx.locks {
         lock.Unlock()
     }
-    tx.locks = nil
+
     return nil
 }
 ```
 
 ## Contributing
-Feel free to submit issues or pull requests if you'd like to contribute! 🎉
+Feel free to submit issues or pull requests if you'd like to contribute! 
 
 ## License
 This project is licensed under the MIT License.
