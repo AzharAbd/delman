@@ -29,9 +29,11 @@ type TransactionInterface[K cmp.Ordered, V any] interface {
 }
 
 type Database[K cmp.Ordered, V any] struct {
-	mu    sync.RWMutex
-	data  map[K]V
-	locks map[K]*sync.Mutex
+	mu   sync.RWMutex
+	data map[K]V
+
+	muLock sync.RWMutex
+	locks  map[K]*sync.Mutex
 }
 
 type Transaction[K cmp.Ordered, V any] struct {
@@ -48,12 +50,19 @@ func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
 	}
 }
 
+// **Helper: Init per-key lock**
+func (db *Database[K, V]) initLock(key K) {
+	db.muLock.Lock()
+	defer db.muLock.Unlock()
+	db.locks[key] = &sync.Mutex{}
+}
+
 // **Helper: Get per-key lock**
 func (db *Database[K, V]) getLock(key K) *sync.Mutex {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.muLock.RLock()
+	defer db.muLock.RUnlock()
 	if _, exists := db.locks[key]; !exists {
-		db.locks[key] = &sync.Mutex{}
+		db.initLock(key)
 	}
 	return db.locks[key]
 }
