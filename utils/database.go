@@ -7,6 +7,12 @@ import (
 	"sync"
 )
 
+const (
+	TxPending    = 0
+	TxCommitted  = 1
+	TxRolledBack = 2
+)
+
 // DatabaseInterface defines a concurrent-safe key-value store with transactional support.
 type DatabaseInterface[K cmp.Ordered, V any] interface {
 	Get(key K) (V, bool)
@@ -29,11 +35,10 @@ type Database[K cmp.Ordered, V any] struct {
 }
 
 type Transaction[K cmp.Ordered, V any] struct {
-	db         *Database[K, V]
-	locks      []*sync.Mutex
-	temp       map[K]V
-	rolledBack bool
-	commited   bool
+	db       *Database[K, V]
+	locks    []*sync.Mutex
+	temp     map[K]V
+	txStatus int
 }
 
 func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
@@ -114,13 +119,13 @@ func (tx *Transaction[K, V]) Set(key K, value V) error {
 
 // **Commit: Apply all changes atomically**
 func (tx *Transaction[K, V]) Commit() error {
-	if tx.rolledBack {
+	if tx.txStatus == TxRolledBack {
 		return errors.New("transaction already rolled back")
 	}
-	if tx.commited {
+	if tx.txStatus == TxCommitted {
 		return errors.New("transaction already committed")
 	}
-	tx.commited = true
+	tx.txStatus = TxCommitted
 
 	tx.db.mu.Lock()
 	defer tx.db.mu.Unlock()
@@ -138,10 +143,10 @@ func (tx *Transaction[K, V]) Commit() error {
 
 // **Rollback: Discard transaction changes**
 func (tx *Transaction[K, V]) Rollback() {
-	if tx.rolledBack || tx.commited {
+	if tx.txStatus != TxPending {
 		return
 	}
-	tx.rolledBack = true
+	tx.txStatus = TxRolledBack
 
 	for _, lock := range tx.locks {
 		lock.Unlock()
