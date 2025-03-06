@@ -33,6 +33,7 @@ type Transaction[K cmp.Ordered, V any] struct {
 	locks      []*sync.Mutex
 	temp       map[K]V
 	rolledBack bool
+	commited   bool
 }
 
 func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
@@ -116,6 +117,10 @@ func (tx *Transaction[K, V]) Commit() error {
 	if tx.rolledBack {
 		return errors.New("transaction already rolled back")
 	}
+	if tx.commited {
+		return errors.New("transaction already committed")
+	}
+	tx.commited = true
 
 	tx.db.mu.Lock()
 	defer tx.db.mu.Unlock()
@@ -127,14 +132,13 @@ func (tx *Transaction[K, V]) Commit() error {
 	for _, lock := range tx.locks {
 		lock.Unlock()
 	}
-	tx.locks = nil
 
 	return nil
 }
 
 // **Rollback: Discard transaction changes**
 func (tx *Transaction[K, V]) Rollback() {
-	if tx.rolledBack {
+	if tx.rolledBack || tx.commited {
 		return
 	}
 	tx.rolledBack = true
@@ -142,5 +146,4 @@ func (tx *Transaction[K, V]) Rollback() {
 	for _, lock := range tx.locks {
 		lock.Unlock()
 	}
-	tx.locks = nil
 }
