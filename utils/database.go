@@ -13,21 +13,6 @@ const (
 	TxRolledBack = 2
 )
 
-// DatabaseInterface defines a concurrent-safe key-value store with transactional support.
-type DatabaseInterface[K cmp.Ordered, V any] interface {
-	Get(key K) (V, bool)
-	Set(key K, value V) error
-	StartTransaction(keys []K) *Transaction[K, V]
-}
-
-// TransactionInterface defines an atomic unit of work on the Database.
-type TransactionInterface[K cmp.Ordered, V any] interface {
-	Get(key K) (V, bool)
-	Set(key K, value V) error
-	Commit() error
-	Rollback()
-}
-
 type Database[K cmp.Ordered, V any] struct {
 	dataMu sync.RWMutex
 	data   map[K]V
@@ -136,11 +121,11 @@ func (tx *Transaction[K, V]) Set(key K, value V) error {
 
 // **Commit: Apply all changes atomically**
 func (tx *Transaction[K, V]) Commit() error {
-	if tx.txStatus == TxRolledBack {
+	switch tx.txStatus {
+	case TxCommitted:
+		return errors.New("transaction already commited")
+	case TxRolledBack:
 		return errors.New("transaction already rolled back")
-	}
-	if tx.txStatus == TxCommitted {
-		return errors.New("transaction already committed")
 	}
 	tx.txStatus = TxCommitted
 
