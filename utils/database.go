@@ -29,10 +29,10 @@ type TransactionInterface[K cmp.Ordered, V any] interface {
 }
 
 type Database[K cmp.Ordered, V any] struct {
-	mu   sync.RWMutex
-	data map[K]V
+	dataMu sync.RWMutex
+	data   map[K]V
 
-	muLock sync.RWMutex
+	lockMu sync.RWMutex
 	locks  map[K]*sync.Mutex
 }
 
@@ -50,27 +50,20 @@ func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
 	}
 }
 
-// **Helper: Init per-key lock**
-func (db *Database[K, V]) initLock(key K) {
-	db.muLock.Lock()
-	defer db.muLock.Unlock()
-	db.locks[key] = &sync.Mutex{}
-}
-
 // **Helper: Get per-key lock**
 func (db *Database[K, V]) getLock(key K) *sync.Mutex {
-	db.muLock.RLock()
-	defer db.muLock.RUnlock()
+	db.lockMu.Lock()
+	defer db.lockMu.Unlock()
 	if _, exists := db.locks[key]; !exists {
-		db.initLock(key)
+		db.locks[key] = &sync.Mutex{}
 	}
 	return db.locks[key]
 }
 
 // **Get: Read-only access (concurrent-safe)**
 func (db *Database[K, V]) Get(key K) (V, bool) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.dataMu.RLock()
+	defer db.dataMu.RUnlock()
 	val, exists := db.data[key]
 	return val, exists
 }
@@ -82,8 +75,8 @@ func (db *Database[K, V]) Set(key K, value V) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.dataMu.Lock()
+	defer db.dataMu.Unlock()
 	db.data[key] = value
 
 	return nil
@@ -136,8 +129,8 @@ func (tx *Transaction[K, V]) Commit() error {
 	}
 	tx.txStatus = TxCommitted
 
-	tx.db.mu.Lock()
-	defer tx.db.mu.Unlock()
+	tx.db.dataMu.Lock()
+	defer tx.db.dataMu.Unlock()
 
 	for key, value := range tx.temp {
 		tx.db.data[key] = value
