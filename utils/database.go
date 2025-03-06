@@ -7,6 +7,21 @@ import (
 	"sync"
 )
 
+// DatabaseInterface defines a concurrent-safe key-value store with transactional support.
+type DatabaseInterface[K cmp.Ordered, V any] interface {
+	Get(key K) (V, bool)
+	Set(key K, value V) error
+	StartTransaction(keys []K) *Transaction[K, V]
+}
+
+// TransactionInterface defines an atomic unit of work on the Database.
+type TransactionInterface[K cmp.Ordered, V any] interface {
+	Get(key K) (V, bool)
+	Set(key K, value V) error
+	Commit() error
+	Rollback()
+}
+
 const (
 	TxPending    = 0
 	TxCommitted  = 1
