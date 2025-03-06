@@ -32,7 +32,7 @@ type Database[K cmp.Ordered, V any] struct {
 	dataMu sync.RWMutex
 	data   map[K]V
 
-	lockMu sync.Mutex
+	lockMu sync.RWMutex
 	locks  map[K]*sync.Mutex
 }
 
@@ -50,14 +50,29 @@ func NewDatabase[K cmp.Ordered, V any]() *Database[K, V] {
 	}
 }
 
-// **Helper: Get per-key lock**
-func (db *Database[K, V]) getLock(key K) *sync.Mutex {
+func (db *Database[K, V]) initLock(key K) *sync.Mutex {
 	db.lockMu.Lock()
 	defer db.lockMu.Unlock()
-	if _, exists := db.locks[key]; !exists {
-		db.locks[key] = &sync.Mutex{}
+
+	if lock, exists := db.locks[key]; exists {
+		return lock
 	}
-	return db.locks[key]
+
+	lock := &sync.Mutex{}
+	db.locks[key] = lock
+	return lock
+}
+
+// **Helper: Get per-key lock**
+func (db *Database[K, V]) getLock(key K) *sync.Mutex {
+	db.lockMu.RLock()
+	lock, exists := db.locks[key]
+	if !exists {
+		db.lockMu.RUnlock()
+		return db.initLock(key)
+	}
+	defer db.lockMu.RUnlock()
+	return lock
 }
 
 // **Get: Read-only access (concurrent-safe)**
