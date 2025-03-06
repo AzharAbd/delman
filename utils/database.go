@@ -32,7 +32,7 @@ type Database[K cmp.Ordered, V any] struct {
 	dataMu sync.RWMutex
 	data   map[K]V
 
-	lockMu sync.RWMutex
+	lockMu sync.Mutex
 	locks  map[K]*sync.Mutex
 }
 
