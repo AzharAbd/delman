@@ -11,6 +11,10 @@ import (
 	"delman/utils/errs"
 )
 
+type UserBalanceHandler struct {
+	db utils.DatabaseInterface[string, model.UserBalance]
+}
+
 type (
 	TransferBalanceRequest struct {
 		Sender   string `json:"sender"`

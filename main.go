@@ -10,8 +10,8 @@ type Response struct {
 }
 
 func main() {
-	model.InitDBUserBalance()
-	handler.InitUserBalanceHandler(model.DBUserBalance)
+	db := model.InitDBUserBalance()
+	uHandler := handler.InitUserBalanceHandler(db)
 
-	InitRouter()
+	InitRouter(uHandler)
 }

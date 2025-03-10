@@ -5,14 +5,12 @@ import (
 	"delman/utils"
 )
 
-var Handler *UserBalanceHandler
+//type UserBalanceHandler struct {
+//	db utils.DatabaseInterface[string, model.UserBalance]
+//}
 
-type UserBalanceHandler struct {
-	db utils.DatabaseInterface[string, model.UserBalance]
-}
-
-func InitUserBalanceHandler(db utils.DatabaseInterface[string, model.UserBalance]) {
-	Handler = &UserBalanceHandler{
+func InitUserBalanceHandler(db utils.DatabaseInterface[string, model.UserBalance]) *UserBalanceHandler {
+	return &UserBalanceHandler{
 		db: db,
 	}
 }

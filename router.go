@@ -8,12 +8,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func InitRouter() {
+func InitRouter(handler *handler.UserBalanceHandler) {
 	r := mux.NewRouter()
-	r.HandleFunc("/balance/transfer", handler.Handler.TransferBalance).Methods("POST")
-	r.HandleFunc("/balance/{user_name}", handler.Handler.GetBalance).Methods("GET")
-	r.HandleFunc("/balance/{user_name}", handler.Handler.UpdateBalance).Methods("PUT")
-	r.HandleFunc("/balance", handler.Handler.InsertBalance).Methods("POST")
+	r.HandleFunc("/balance/transfer", handler.TransferBalance).Methods("POST")
+	r.HandleFunc("/balance/{user_name}", handler.GetBalance).Methods("GET")
+	r.HandleFunc("/balance/{user_name}", handler.UpdateBalance).Methods("PUT")
+	r.HandleFunc("/balance", handler.InsertBalance).Methods("POST")
 
 	http.Handle("/", r)
 	log.Println("Server is running on port 8080")
